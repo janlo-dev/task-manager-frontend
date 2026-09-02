@@ -31,7 +31,7 @@ function ColumnCard({ column }) {
       await createTask(title, description, column.id)
       setTitle('')
       setDescription('')
-      loadTasks() // recargamos la lista tras crear
+      loadTasks()
     } catch (err) {
       setError(err.message)
     } finally {
@@ -40,48 +40,53 @@ function ColumnCard({ column }) {
   }
 
   return (
-    <div style={{ border: '1px solid #ccc', padding: '1rem', minWidth: '220px' }}>
-      <h3>{column.name}</h3>
+    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 w-72 shrink-0 flex flex-col">
+      <h3 className="font-bold text-gray-700 uppercase text-sm tracking-wide mb-3">
+        {column.name}
+      </h3>
 
-      {loading && <p>Cargando tareas...</p>}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {loading && <p className="text-sm text-gray-400">Cargando tareas...</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
-      {!loading && (
-        tasks.length === 0 ? (
-          <p>Sin tareas</p>
-        ) : (
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {tasks.map((task) => (
-              <li key={task.id} style={{ marginBottom: '0.75rem' }}>
-                <strong>{task.title}</strong>
-                <p style={{ margin: '0.25rem 0' }}>{task.description}</p>
-                <small style={{ color: '#666' }}>
-                  Creada: {new Date(task.createdAt).toLocaleString()}
-                </small>
-              </li>
-            ))}
-          </ul>
-        )
-      )}
+      <div className="space-y-2 flex-1">
+        {!loading && tasks.length === 0 && (
+          <p className="text-sm text-gray-400 italic">Sin tareas</p>
+        )}
 
-      <form onSubmit={handleCreateTask} style={{ marginTop: '1rem' }}>
-        <div>
-          <input
-            type="text"
-            placeholder="Título"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <textarea
-            placeholder="Descripción"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-        <button type="submit" disabled={creating}>
+        {tasks.map((task) => (
+          <div key={task.id} className="bg-white border border-gray-200 rounded-md p-3 shadow-sm">
+            <p className="font-medium text-gray-800">{task.title}</p>
+            {task.description && (
+              <p className="text-sm text-gray-600 mt-1">{task.description}</p>
+            )}
+            <p className="text-xs text-gray-400 mt-2">
+              {new Date(task.createdAt).toLocaleString()}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <form onSubmit={handleCreateTask} className="mt-3 space-y-2 pt-3 border-t border-gray-200">
+        <input
+          type="text"
+          placeholder="Título de la tarea"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+          className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <textarea
+          placeholder="Descripción (opcional)"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+          className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button
+          type="submit"
+          disabled={creating}
+          className="w-full text-sm bg-blue-600 text-white font-medium py-1.5 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
           {creating ? 'Creando...' : '+ Añadir tarea'}
         </button>
       </form>
