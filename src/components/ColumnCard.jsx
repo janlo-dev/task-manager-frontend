@@ -1,26 +1,12 @@
-import { useState, useEffect } from 'react'
-import { getTasksByColumn, createTask } from '../services/taskService'
+import { useState } from 'react'
+import { Droppable, Draggable } from '@hello-pangea/dnd'
 
-function ColumnCard({ column }) {
-  const [tasks, setTasks] = useState([])
-  const [loading, setLoading] = useState(true)
+function ColumnCard({ column, tasks, onCreateTask, dragHandleProps }) {
   const [error, setError] = useState(null)
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [creating, setCreating] = useState(false)
-
-  const loadTasks = () => {
-    setLoading(true)
-    getTasksByColumn(column.id)
-      .then((data) => setTasks(data))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => {
-    loadTasks()
-  }, [column.id])
 
   const handleCreateTask = async (e) => {
     e.preventDefault()
@@ -28,10 +14,9 @@ function ColumnCard({ column }) {
     setError(null)
 
     try {
-      await createTask(title, description, column.id)
+      await onCreateTask(column.id, title, description)
       setTitle('')
       setDescription('')
-      loadTasks()
     } catch (err) {
       setError(err.message)
     } finally {
@@ -41,30 +26,55 @@ function ColumnCard({ column }) {
 
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 w-72 shrink-0 flex flex-col">
-      <h3 className="font-bold text-gray-700 uppercase text-sm tracking-wide mb-3">
+      {/* Solo el título es el asa para arrastrar la columna */}
+      <h3
+        {...dragHandleProps}
+        className="font-bold text-gray-700 uppercase text-sm tracking-wide mb-3 cursor-grab"
+      >
         {column.name}
       </h3>
 
-      {loading && <p className="text-sm text-gray-400">Cargando tareas...</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="space-y-2 flex-1">
-        {!loading && tasks.length === 0 && (
-          <p className="text-sm text-gray-400 italic">Sin tareas</p>
-        )}
-
-        {tasks.map((task) => (
-          <div key={task.id} className="bg-white border border-gray-200 rounded-md p-3 shadow-sm">
-            <p className="font-medium text-gray-800">{task.title}</p>
-            {task.description && (
-              <p className="text-sm text-gray-600 mt-1">{task.description}</p>
+      <Droppable droppableId={String(column.id)} type="task">
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className={`space-y-2 flex-1 min-h-16 rounded-md transition-colors ${
+              snapshot.isDraggingOver ? 'bg-blue-50' : ''
+            }`}
+          >
+            {tasks.length === 0 && !snapshot.isDraggingOver && (
+              <p className="text-sm text-gray-400 italic">Sin tareas</p>
             )}
-            <p className="text-xs text-gray-400 mt-2">
-              {new Date(task.createdAt).toLocaleString()}
-            </p>
+
+            {tasks.map((task, index) => (
+              <Draggable key={task.id} draggableId={`task-${task.id}`} index={index}>
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    {...provided.dragHandleProps}
+                    className={`bg-white border border-gray-200 rounded-md p-3 shadow-sm ${
+                      snapshot.isDragging ? 'opacity-80' : ''
+                    }`}
+                  >
+                    <p className="font-medium text-gray-800">{task.title}</p>
+                    {task.description && (
+                      <p className="text-sm text-gray-600 mt-1">{task.description}</p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-2">
+                      {new Date(task.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </Draggable>
+            ))}
+            {provided.placeholder}
           </div>
-        ))}
-      </div>
+        )}
+      </Droppable>
 
       <form onSubmit={handleCreateTask} className="mt-3 space-y-2 pt-3 border-t border-gray-200">
         <input

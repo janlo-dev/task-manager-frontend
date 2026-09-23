@@ -10,3 +10,10 @@ export function createTask(title, description, columnId) {
     body: JSON.stringify({ title, description, columnId }),
   })
 }
+
+export function moveTask(taskId, newColumnId) {
+  return apiFetch('/tasks/move', {
+    method: 'PUT',
+    body: JSON.stringify({ taskId, newColumnId }),
+  })
+}
