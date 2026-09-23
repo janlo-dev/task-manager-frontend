@@ -17,7 +17,8 @@ function App() {
     if (loggedIn && !boardsChecked) {
       getMyBoards()
         .then((boards) => {
-          if (boards.length > 0) {
+          // Solo entramos directamente si hay un único tablero; con 2 o más, se muestra la lista
+          if (boards.length === 1) {
             setSelectedBoardId(boards[0].id)
           }
         })
@@ -38,7 +39,10 @@ function App() {
         <h1>Task Manager</h1>
         <button onClick={handleLogout}>Cerrar sesión</button>
 
-        {selectedBoardId ? (
+        {!boardsChecked ? (
+          // Evita que se vea la lista un instante antes de entrar al único tablero
+          <p className="text-gray-500 text-center mt-8">Cargando tableros...</p>
+        ) : selectedBoardId ? (
           <BoardDetail
             boardId={selectedBoardId}
             onBack={() => setSelectedBoardId(null)}
