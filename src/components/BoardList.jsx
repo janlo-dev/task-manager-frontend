@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { getMyBoards, createBoard } from '../services/boardService'
+import { getMyBoards, createBoard, renameBoard, deleteBoard } from '../services/boardService'
+import InlineEdit from './InlineEdit'
 
 function BoardList({ onSelectBoard }) {
   const [boards, setBoards] = useState([])
@@ -27,7 +28,7 @@ function BoardList({ onSelectBoard }) {
     setError(null)
 
     try {
-      const nextOrder = boards.length
+      const nextOrder = boards.length === 0 ? 0 : Math.max(...boards.map((b) => b.boardOrder)) + 1
       await createBoard(newBoardName, nextOrder)
       setNewBoardName('')
       loadBoards()
@@ -35,6 +36,34 @@ function BoardList({ onSelectBoard }) {
       setError(err.message)
     } finally {
       setCreating(false)
+    }
+  }
+
+  const handleRenameBoard = async (boardId, newName) => {
+    // 1. Actualizamos la UI al instante (optimistic update)
+    setBoards((prev) => prev.map((b) => (b.id === boardId ? { ...b, name: newName } : b)))
+
+    // 2. Persistimos en el backend
+    setError(null)
+    try {
+      await renameBoard(boardId, newName)
+    } catch (err) {
+      setError(err.message)
+      loadBoards() // si falla, recargamos los datos reales
+    }
+  }
+
+  const handleDeleteBoard = async (board) => {
+    if (!window.confirm(`¿Borrar el tablero «${board.name}» y todo su contenido? No se puede deshacer.`)) return
+
+    setBoards((prev) => prev.filter((b) => b.id !== board.id))
+
+    setError(null)
+    try {
+      await deleteBoard(board.id)
+    } catch (err) {
+      setError(err.message)
+      loadBoards()
     }
   }
 
@@ -51,13 +80,38 @@ function BoardList({ onSelectBoard }) {
       ) : (
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6" style={{ listStyle: 'none', padding: 0 }}>
           {boards.map((board) => (
-            <li key={board.id}>
-              <button
-                onClick={() => onSelectBoard(board.id)}
-                className="w-full text-left bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md hover:border-blue-400 transition-all"
-              >
-                <span className="font-semibold text-gray-800">{board.name}</span>
-              </button>
+            <li
+              key={board.id}
+              className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md hover:border-blue-400 transition-all"
+            >
+              <InlineEdit
+                value={board.name}
+                onSave={(newName) => handleRenameBoard(board.id, newName)}
+                renderView={(startEditing) => (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => onSelectBoard(board.id)}
+                      className="flex-1 text-left font-semibold text-gray-800 hover:text-blue-600"
+                    >
+                      {board.name}
+                    </button>
+                    <button
+                      onClick={startEditing}
+                      title="Renombrar tablero"
+                      className="text-sm text-gray-400 hover:text-gray-700"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => handleDeleteBoard(board)}
+                      title="Borrar tablero"
+                      className="text-sm text-gray-400 hover:text-red-600"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                )}
+              />
             </li>
           ))}
         </ul>

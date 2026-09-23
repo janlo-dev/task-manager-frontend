@@ -17,3 +17,14 @@ export function moveTask(taskId, newColumnId) {
     body: JSON.stringify({ taskId, newColumnId }),
   })
 }
+
+export function updateTaskDescription(taskId, newDescription) {
+  return apiFetch('/tasks/description', {
+    method: 'PUT',
+    body: JSON.stringify({ taskId, newDescription }),
+  })
+}
+
+export function deleteTask(taskId) {
+  return apiFetch(`/tasks/${taskId}`, { method: 'DELETE' })
+}

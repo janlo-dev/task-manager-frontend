@@ -1,7 +1,17 @@
 import { useState } from 'react'
 import { Droppable, Draggable } from '@hello-pangea/dnd'
+import InlineEdit from './InlineEdit'
 
-function ColumnCard({ column, tasks, onCreateTask, dragHandleProps }) {
+function ColumnCard({
+  column,
+  tasks,
+  onCreateTask,
+  onRenameColumn,
+  onDeleteColumn,
+  onUpdateTaskDescription,
+  onDeleteTask,
+  dragHandleProps,
+}) {
   const [error, setError] = useState(null)
 
   const [title, setTitle] = useState('')
@@ -26,13 +36,35 @@ function ColumnCard({ column, tasks, onCreateTask, dragHandleProps }) {
 
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 w-72 shrink-0 flex flex-col">
-      {/* Solo el título es el asa para arrastrar la columna */}
-      <h3
-        {...dragHandleProps}
-        className="font-bold text-gray-700 uppercase text-sm tracking-wide mb-3 cursor-grab"
-      >
-        {column.name}
-      </h3>
+      {/* Solo la cabecera es el asa para arrastrar la columna. La librería no inicia
+          el arrastre desde botones ni inputs, así que ✏️, 🗑️ y el input no interfieren */}
+      <div {...dragHandleProps} className="mb-3 cursor-grab">
+        <InlineEdit
+          value={column.name}
+          onSave={(newName) => onRenameColumn(column.id, newName)}
+          renderView={(startEditing) => (
+            <div className="flex items-center gap-2">
+              <h3 className="flex-1 font-bold text-gray-700 uppercase text-sm tracking-wide">
+                {column.name}
+              </h3>
+              <button
+                onClick={startEditing}
+                title="Renombrar columna"
+                className="text-sm text-gray-400 hover:text-gray-700"
+              >
+                ✏️
+              </button>
+              <button
+                onClick={() => onDeleteColumn(column)}
+                title="Borrar columna"
+                className="text-sm text-gray-400 hover:text-red-600"
+              >
+                🗑️
+              </button>
+            </div>
+          )}
+        />
+      </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -60,10 +92,50 @@ function ColumnCard({ column, tasks, onCreateTask, dragHandleProps }) {
                       snapshot.isDragging ? 'opacity-80' : ''
                     }`}
                   >
-                    <p className="font-medium text-gray-800">{task.title}</p>
-                    {task.description && (
-                      <p className="text-sm text-gray-600 mt-1">{task.description}</p>
-                    )}
+                    <div className="flex items-start gap-2">
+                      <p className="flex-1 font-medium text-gray-800">{task.title}</p>
+                      <button
+                        onClick={() => onDeleteTask(column.id, task)}
+                        title="Borrar tarea"
+                        className="text-sm text-gray-400 hover:text-red-600"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+
+                    <div className="mt-1">
+                      <InlineEdit
+                        value={task.description}
+                        onSave={(newDescription) =>
+                          onUpdateTaskDescription(column.id, task.id, newDescription)
+                        }
+                        multiline
+                        allowEmpty
+                        renderView={(startEditing) =>
+                          task.description ? (
+                            <div className="flex items-start gap-2">
+                              <p className="flex-1 text-sm text-gray-600 whitespace-pre-wrap">
+                                {task.description}
+                              </p>
+                              <button
+                                onClick={startEditing}
+                                title="Editar descripción"
+                                className="text-sm text-gray-400 hover:text-gray-700"
+                              >
+                                ✏️
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={startEditing}
+                              className="text-sm text-gray-400 hover:text-gray-700"
+                            >
+                              + Añadir descripción
+                            </button>
+                          )
+                        }
+                      />
+                    </div>
                     <p className="text-xs text-gray-400 mt-2">
                       {new Date(task.createdAt).toLocaleString()}
                     </p>

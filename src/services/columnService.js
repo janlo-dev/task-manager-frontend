@@ -17,3 +17,14 @@ export function changeColumnOrder(columnId, newOrder) {
     body: JSON.stringify({ columnId, newOrder }),
   })
 }
+
+export function renameColumn(columnId, newName) {
+  return apiFetch('/columns/rename', {
+    method: 'PUT',
+    body: JSON.stringify({ columnId, newName }),
+  })
+}
+
+export function deleteColumn(columnId) {
+  return apiFetch(`/columns/${columnId}`, { method: 'DELETE' })
+}

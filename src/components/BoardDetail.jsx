@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
-import { getColumnsByBoard, createColumn, changeColumnOrder } from '../services/columnService'
-import { getTasksByColumn, createTask, moveTask } from '../services/taskService'
+import { getColumnsByBoard, createColumn, changeColumnOrder, renameColumn, deleteColumn } from '../services/columnService'
+import { getTasksByColumn, createTask, moveTask, updateTaskDescription, deleteTask } from '../services/taskService'
 import ColumnCard from './ColumnCard'
 
 function BoardDetail({ boardId, onBack }) {
@@ -37,7 +37,7 @@ function BoardDetail({ boardId, onBack }) {
     setError(null)
 
     try {
-      const nextOrder = columns.length
+      const nextOrder = columns.length === 0 ? 0 : Math.max(...columns.map((c) => c.columnOrder)) + 1
       await createColumn(newColumnName, nextOrder, boardId)
       setNewColumnName('')
       loadBoard()
@@ -53,6 +53,71 @@ function BoardDetail({ boardId, onBack }) {
     await createTask(title, description, columnId)
     const tasks = await getTasksByColumn(columnId) // recargamos solo esa columna
     setTasksByColumn((prev) => ({ ...prev, [columnId]: tasks }))
+  }
+
+  const handleRenameColumn = async (columnId, newName) => {
+    // 1. Actualizamos la UI al instante (optimistic update)
+    setColumns((prev) => prev.map((c) => (c.id === columnId ? { ...c, name: newName } : c)))
+
+    // 2. Persistimos en el backend
+    setError(null)
+    try {
+      await renameColumn(columnId, newName)
+    } catch (err) {
+      setError(err.message)
+      loadBoard() // si falla, recargamos los datos reales
+    }
+  }
+
+  const handleDeleteColumn = async (column) => {
+    if (!window.confirm(`¿Borrar la columna «${column.name}» y todo su contenido? No se puede deshacer.`)) return
+
+    setColumns((prev) => prev.filter((c) => c.id !== column.id))
+    setTasksByColumn((prev) => {
+      const next = { ...prev }
+      delete next[column.id]
+      return next
+    })
+
+    setError(null)
+    try {
+      await deleteColumn(column.id)
+    } catch (err) {
+      setError(err.message)
+      loadBoard()
+    }
+  }
+
+  const handleUpdateTaskDescription = async (columnId, taskId, newDescription) => {
+    setTasksByColumn((prev) => ({
+      ...prev,
+      [columnId]: prev[columnId].map((t) => (t.id === taskId ? { ...t, description: newDescription } : t)),
+    }))
+
+    setError(null)
+    try {
+      await updateTaskDescription(taskId, newDescription)
+    } catch (err) {
+      setError(err.message)
+      loadBoard()
+    }
+  }
+
+  const handleDeleteTask = async (columnId, task) => {
+    if (!window.confirm(`¿Borrar la tarea «${task.title}»? No se puede deshacer.`)) return
+
+    setTasksByColumn((prev) => ({
+      ...prev,
+      [columnId]: prev[columnId].filter((t) => t.id !== task.id),
+    }))
+
+    setError(null)
+    try {
+      await deleteTask(task.id)
+    } catch (err) {
+      setError(err.message)
+      loadBoard()
+    }
   }
 
   const handleDragEnd = async (result) => {
@@ -142,6 +207,10 @@ function BoardDetail({ boardId, onBack }) {
                         column={column}
                         tasks={tasksByColumn[column.id] ?? []}
                         onCreateTask={handleCreateTask}
+                        onRenameColumn={handleRenameColumn}
+                        onDeleteColumn={handleDeleteColumn}
+                        onUpdateTaskDescription={handleUpdateTaskDescription}
+                        onDeleteTask={handleDeleteTask}
                         dragHandleProps={provided.dragHandleProps}
                       />
                     </div>

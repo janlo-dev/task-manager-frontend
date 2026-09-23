@@ -10,3 +10,14 @@ export function createBoard(name, boardOrder) {
     body: JSON.stringify({ name, boardOrder }),
   })
 }
+
+export function renameBoard(boardId, newName) {
+  return apiFetch('/boards/rename', {
+    method: 'PUT',
+    body: JSON.stringify({ boardId, newName }),
+  })
+}
+
+export function deleteBoard(boardId) {
+  return apiFetch(`/boards/${boardId}`, { method: 'DELETE' })
+}
