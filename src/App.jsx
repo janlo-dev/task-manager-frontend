@@ -5,7 +5,6 @@ import BoardList from './components/BoardList'
 import BoardDetail from './components/BoardDetail'
 import { isAuthenticated, logout } from './services/authService'
 import { getMyBoards } from './services/boardService'
-import './App.css'
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(isAuthenticated())
@@ -35,9 +34,16 @@ function App() {
 
   if (loggedIn) {
     return (
-      <div>
-        <h1>Task Manager</h1>
-        <button onClick={handleLogout}>Cerrar sesión</button>
+      <div className="min-h-screen bg-gray-100">
+        <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+          <h1 className="text-xl font-bold text-gray-800">Task Manager</h1>
+          <button
+            onClick={handleLogout}
+            className="text-sm text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-100 hover:text-gray-800 transition-colors"
+          >
+            Cerrar sesión
+          </button>
+        </header>
 
         {!boardsChecked ? (
           // Evita que se vea la lista un instante antes de entrar al único tablero
@@ -55,14 +61,17 @@ function App() {
   }
 
   return (
-    <div>
-      <h1>Task Manager</h1>
+    <div className="min-h-screen bg-gray-100 px-4 py-10 flex flex-col">
+      <h1 className="text-3xl font-bold text-gray-800 text-center">Task Manager</h1>
       {showRegister ? (
         <Register onRegisterSuccess={() => setLoggedIn(true)} />
       ) : (
         <Login onLoginSuccess={() => setLoggedIn(true)} />
       )}
-      <button onClick={() => setShowRegister(!showRegister)}>
+      <button
+        onClick={() => setShowRegister(!showRegister)}
+        className="mt-4 self-center text-sm text-blue-600 hover:text-blue-800"
+      >
         {showRegister ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate'}
       </button>
     </div>
