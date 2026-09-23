@@ -10,6 +10,8 @@ function ColumnCard({
   onDeleteColumn,
   onUpdateTaskDescription,
   onDeleteTask,
+  members,
+  onAssignTask,
   dragHandleProps,
 }) {
   const [error, setError] = useState(null)
@@ -136,6 +138,25 @@ function ColumnCard({
                         }
                       />
                     </div>
+                    {/* Los value de <select> son strings: recuperamos el userId original del miembro */}
+                    <select
+                      value={task.assignedUserId ?? ''}
+                      onChange={(e) => {
+                        const member = members.find((m) => String(m.userId) === e.target.value)
+                        onAssignTask(column.id, task.id, member ? member.userId : null)
+                      }}
+                      className="mt-2 w-full text-xs border border-gray-300 rounded-md px-2 py-1 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Sin asignar</option>
+                      {members
+                        .filter((m) => !m.pending)
+                        .map((m) => (
+                          <option key={m.memberId} value={m.userId}>
+                            {m.name}
+                          </option>
+                        ))}
+                    </select>
+
                     <p className="text-xs text-gray-400 mt-2">
                       {new Date(task.createdAt).toLocaleString()}
                     </p>

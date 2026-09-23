@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { getColumnsByBoard, createColumn, changeColumnOrder, renameColumn, deleteColumn } from '../services/columnService'
-import { getTasksByColumn, createTask, moveTask, updateTaskDescription, deleteTask } from '../services/taskService'
+import { getTasksByColumn, createTask, moveTask, updateTaskDescription, deleteTask, assignTask } from '../services/taskService'
+import { getBoardMembers, inviteBoardMember, removeBoardMember } from '../services/boardMemberService'
 import ColumnCard from './ColumnCard'
 
 function BoardDetail({ boardId, onBack }) {
@@ -12,6 +13,13 @@ function BoardDetail({ boardId, onBack }) {
 
   const [newColumnName, setNewColumnName] = useState('')
   const [creating, setCreating] = useState(false)
+
+  // Miembros: única fuente de verdad, se pasa por prop a ColumnCard para el <select> de asignación
+  const [members, setMembers] = useState([])
+  const [showMembers, setShowMembers] = useState(false)
+  const [membersError, setMembersError] = useState(null)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviting, setInviting] = useState(false)
 
   const loadBoard = async () => {
     setLoading(true)
@@ -27,9 +35,67 @@ function BoardDetail({ boardId, onBack }) {
     }
   }
 
+  // Separada de loadBoard: si falla una operación sobre tareas no hace falta volver a pedir los miembros
+  const loadMembers = async () => {
+    try {
+      setMembers(await getBoardMembers(boardId))
+    } catch (err) {
+      setMembersError(err.message)
+    }
+  }
+
   useEffect(() => {
     loadBoard()
+    loadMembers()
   }, [boardId])
+
+  const handleInviteMember = async (e) => {
+    e.preventDefault()
+    const email = inviteEmail.trim()
+    setInviting(true)
+    setMembersError(null)
+
+    // 1. Fila provisional: el backend no devuelve name/email al invitar
+    setMembers((prev) => [
+      ...prev,
+      { memberId: `pending-${email}`, email, name: email, role: 'MEMBER', pending: true },
+    ])
+
+    // 2. Invitamos y recargamos para obtener los datos reales del nuevo miembro
+    try {
+      await inviteBoardMember(boardId, email)
+      setInviteEmail('')
+      await loadMembers()
+    } catch (err) {
+      setMembersError(err.message) // error del backend tal cual (no existe, ya es miembro, 403...)
+      loadMembers()
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  const handleRemoveMember = async (member) => {
+    if (!window.confirm(`¿Expulsar a «${member.name}» del tablero?`)) return
+
+    setMembers((prev) => prev.filter((m) => m.memberId !== member.memberId))
+
+    setMembersError(null)
+    try {
+      await removeBoardMember(boardId, member.userId)
+      // El backend todavía no desasigna sus tareas: lo reflejamos en local
+      setTasksByColumn((prev) =>
+        Object.fromEntries(
+          Object.entries(prev).map(([columnId, tasks]) => [
+            columnId,
+            tasks.map((t) => (t.assignedUserId === member.userId ? { ...t, assignedUserId: null } : t)),
+          ])
+        )
+      )
+    } catch (err) {
+      setMembersError(err.message)
+      loadMembers()
+    }
+  }
 
   const handleCreateColumn = async (e) => {
     e.preventDefault()
@@ -99,6 +165,21 @@ function BoardDetail({ boardId, onBack }) {
       await updateTaskDescription(taskId, newDescription)
     } catch (err) {
       setError(err.message)
+      loadBoard()
+    }
+  }
+
+  const handleAssignTask = async (columnId, taskId, assignedUserId) => {
+    setTasksByColumn((prev) => ({
+      ...prev,
+      [columnId]: prev[columnId].map((t) => (t.id === taskId ? { ...t, assignedUserId } : t)),
+    }))
+
+    setError(null)
+    try {
+      await assignTask(taskId, assignedUserId)
+    } catch (err) {
+      setError(err.message) // p. ej. el usuario no es miembro del tablero
       loadBoard()
     }
   }
@@ -187,6 +268,65 @@ function BoardDetail({ boardId, onBack }) {
 
       {error && <p className="text-red-600 mb-4">{error}</p>}
 
+      <div className="mb-4">
+        <button
+          onClick={() => setShowMembers(!showMembers)}
+          className="text-sm text-gray-600 hover:text-gray-800 font-medium"
+        >
+          {showMembers ? 'Ocultar miembros ▴' : `Ver miembros (${members.length}) ▾`}
+        </button>
+
+        {showMembers && (
+          <div className="mt-2 bg-white border border-gray-200 rounded-lg p-4 shadow-sm max-w-md space-y-3">
+            {membersError && <p className="text-sm text-red-600">{membersError}</p>}
+
+            <ul className="space-y-2" style={{ listStyle: 'none', padding: 0 }}>
+              {members.map((member) => (
+                <li key={member.memberId} className="flex items-center gap-2 text-sm">
+                  <span className={`flex-1 ${member.pending ? 'text-gray-400 italic' : 'text-gray-800'}`}>
+                    {member.pending ? `${member.email} · invitando...` : member.name}
+                  </span>
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded ${
+                      member.role === 'OWNER' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {member.role}
+                  </span>
+                  {member.role === 'MEMBER' && !member.pending && (
+                    <button
+                      onClick={() => handleRemoveMember(member)}
+                      title="Expulsar del tablero"
+                      className="text-sm text-gray-400 hover:text-red-600"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+
+            <form onSubmit={handleInviteMember} className="flex gap-2 pt-3 border-t border-gray-200">
+              <input
+                type="email"
+                placeholder="Email del usuario a invitar"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                required
+                className="flex-1 text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="submit"
+                disabled={inviting}
+                className="text-sm bg-blue-600 text-white font-medium px-3 py-1.5 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {inviting ? 'Invitando...' : 'Invitar'}
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+
       <DragDropContext onDragEnd={handleDragEnd}>
         <Droppable droppableId="board-columns" direction="horizontal" type="column">
           {(provided) => (
@@ -211,6 +351,8 @@ function BoardDetail({ boardId, onBack }) {
                         onDeleteColumn={handleDeleteColumn}
                         onUpdateTaskDescription={handleUpdateTaskDescription}
                         onDeleteTask={handleDeleteTask}
+                        members={members}
+                        onAssignTask={handleAssignTask}
                         dragHandleProps={provided.dragHandleProps}
                       />
                     </div>

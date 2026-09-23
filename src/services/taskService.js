@@ -28,3 +28,10 @@ export function updateTaskDescription(taskId, newDescription) {
 export function deleteTask(taskId) {
   return apiFetch(`/tasks/${taskId}`, { method: 'DELETE' })
 }
+
+export function assignTask(taskId, assignedUserId) {
+  return apiFetch('/tasks/assign', {
+    method: 'PUT',
+    body: JSON.stringify({ taskId, assignedUserId }),
+  })
+}
