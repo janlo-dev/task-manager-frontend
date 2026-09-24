@@ -3,6 +3,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { getColumnsByBoard, createColumn, changeColumnOrder, renameColumn, deleteColumn } from '../services/columnService'
 import { getTasksByColumn, createTask, moveTask, updateTaskDescription, deleteTask, assignTask } from '../services/taskService'
 import { getBoardMembers, inviteBoardMember, removeBoardMember } from '../services/boardMemberService'
+import { computeDragResult } from '../utils/dragAndDrop'
 import ColumnCard from './ColumnCard'
 
 function BoardDetail({ boardId, onBack }) {
@@ -82,7 +83,7 @@ function BoardDetail({ boardId, onBack }) {
     setMembersError(null)
     try {
       await removeBoardMember(boardId, member.userId)
-      // El backend todavía no desasigna sus tareas: lo reflejamos en local
+      // El backend ya desasigna sus tareas; lo reflejamos en local para no esperar a un loadBoard()
       setTasksByColumn((prev) =>
         Object.fromEntries(
           Object.entries(prev).map(([columnId, tasks]) => [
@@ -202,52 +203,27 @@ function BoardDetail({ boardId, onBack }) {
   }
 
   const handleDragEnd = async (result) => {
-    const { source, destination, draggableId, type } = result
+    // Qué ha pasado y cuál es el nuevo estado lo decide la función pura (ver utils/dragAndDrop.js)
+    const action = computeDragResult(result, columns, tasksByColumn)
 
-    if (!destination) return // se soltó fuera de cualquier zona válida
+    if (action.type === 'column') {
+      setColumns(action.columns) // 1. Actualiza la pantalla al instante (optimistic update)
 
-    if (type === 'column') {
-      if (source.index === destination.index) return // no cambió de posición
-
-      // 1. Actualizamos la UI al instante (optimistic update)
-      const reordered = Array.from(columns)
-      const [moved] = reordered.splice(source.index, 1)
-      reordered.splice(destination.index, 0, moved)
-      setColumns(reordered)  // 1. Actualiza la pantalla al instante
-
-      // 2. Persistimos el nuevo orden en el backend
       setError(null)
       try {
-        await changeColumnOrder(draggableId, destination.index) // 2. Luego persiste en el backend
+        await changeColumnOrder(action.columnId, action.newIndex) // 2. Luego persiste en el backend
       } catch (err) {
         setError(err.message)
         loadBoard() // si falla, recargamos el orden real desde el servidor
       }
-      return
     }
 
-    if (type === 'task') {
-      // El reordenamiento dentro de la misma columna se implementará más adelante
-      if (source.droppableId === destination.droppableId) return
+    if (action.type === 'task') {
+      setTasksByColumn(action.tasksByColumn)
 
-      const sourceTasks = Array.from(tasksByColumn[source.droppableId] ?? [])
-      const destTasks = Array.from(tasksByColumn[destination.droppableId] ?? [])
-      const destColumn = columns.find((c) => String(c.id) === destination.droppableId)
-
-      // 1. Actualizamos la UI al instante: la tarea va siempre al final de la columna destino,
-      //    porque el backend no tiene orden de tareas dentro de una columna
-      const [moved] = sourceTasks.splice(source.index, 1)
-      destTasks.push({ ...moved, columnId: destColumn.id })
-      setTasksByColumn((prev) => ({
-        ...prev,
-        [source.droppableId]: sourceTasks,
-        [destination.droppableId]: destTasks,
-      }))
-
-      // 2. Persistimos el cambio de columna en el backend
       setError(null)
       try {
-        await moveTask(moved.id, destColumn.id)
+        await moveTask(action.taskId, action.destColumnId)
       } catch (err) {
         setError(err.message)
         loadBoard() // si falla, recargamos el estado real desde el servidor
