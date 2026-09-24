@@ -1,6 +1,5 @@
 import { getToken, logout } from './authService'
-
-const API_BASE_URL = 'http://localhost:8080/api'
+import { API_BASE_URL } from './config'
 
 export async function apiFetch(path, options = {}) {
   const token = getToken()

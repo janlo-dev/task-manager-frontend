@@ -1,4 +1,5 @@
-const API_BASE_URL = 'http://localhost:8080/api'
+import { API_BASE_URL } from './config'
+
 const TOKEN_KEY = 'accessToken'
 const USER_ID_KEY = 'userId'
 
